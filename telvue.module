@@ -1,0 +1,205 @@
+<?php
+
+/**
+ * Implements hook_permission().
+ */
+function telvue_permission() {
+  $permissions = array(
+    'administer telvue' => array(
+      'title' => t('Administer Telvue'),
+      'description' => t('Allows users to configure Telvue settings.'),
+      'restrict access' => TRUE,
+    ),
+  );
+
+  return $permissions;
+}
+
+
+/**
+ * Implements hook_menu().
+ */
+function telvue_menu() {
+  $items['admin/config/system/telvue'] = array(
+    'title' => 'Telvue Configuration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('telvue_admin_settings'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer telvue'),
+    'description' => 'Configure system settings for Telvue integration.',
+  );
+
+  return $items;
+}
+
+/**
+ * Builds the admininstration settings form.
+ */
+function telvue_admin_settings($form, &$form_state) {
+  $form = array();
+
+  if (variable_get('telvue_uri', NULL)) {
+    $version = telvue_software_version(variable_get('telvue_uri', NULL), variable_get('telvue_api_key', NULL));
+
+    if (isset($version['software_version'])) {
+	  drupal_set_message(t('Successfully communicating with the Telvue.  Telvue is running version ') . $version['software_version']);
+    } else {
+      if ($version['status'] == 'Access Denied') {
+        drupal_set_message(t('Connected to Telvue, but API key is either not included or not correct.  API Key is required for advanced features like Telvue Push.'), 'warning');
+      } else {
+        drupal_set_message(t('There is a problem communicating with the server. Please check the URI.'), 'error');
+      }
+    }
+  }
+
+  $form['telvue_uri'] = array(
+    '#type' => 'textfield',
+    '#title' => t('URI'),
+    '#size' => 50,
+    '#maxlength' => 50,
+    '#default_value' => variable_get('telvue_uri', NULL),
+    '#description' => t('IP address or URL of the Telvue server including the :3000 (ie. http://b1000.yourdomain.org:3000 or https://172.25.0.xx:3000)'),
+  );
+
+  $form['telvue_connection_error'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Connection Error Message'),
+    '#rows' => 10,
+    '#cols' => 5,
+    '#default_value' => variable_get('telvue_connection_error', t('Unable to update')),
+    '#description' => t('Enter the message users will see in the blocks if Drupal cannot connect to the Telvue API.  If left blank, the block will not be displayed.'),
+  );
+
+  $form['telvue_cache'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Cache results from API when possible'),
+    '#default_value' => variable_get('telvue_cache', 0),
+    '#description' => t(''),
+  );
+
+  $form['telvue_user'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Username'),
+    '#size' => 25,
+    '#maxlength' => 25,
+    '#default_value' => variable_get('telvue_user', NULL),
+    '#description' => t('This is a user on the Telvue server with the API option enabled.'),
+  );
+
+  $form['telvue_api_key'] = array(
+    '#type' => 'textfield',
+    '#title' => t('API Key'),
+    '#size' => 25,
+    '#maxlength' => 25,
+    '#default_value' => variable_get('telvue_api_key', NULL),
+    '#description' => t(''),
+  );
+
+  $form['telvue_verbose_logging'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Verbose Logging Mode'),
+    '#default_value' => variable_get('telvue_verbose_logging', 0),
+    '#description' => t('This option will add log messages at several points in during the API connections making it easier to diagnose configuration issues.'),
+  );
+
+  $form = system_settings_form($form);
+
+  return ($form);
+}
+
+/**
+ * Pushes program to Telvue server based on field mapping in custom module
+ *
+ */
+function telvue_addprogram($program, $server) {
+  // Get data from $programs array.
+  $program['import_datetime'] = date('Y-m-d H:i:s', time());
+
+  // Get telvue api key
+  $program['api_key'] = variable_get('telvue_api_key', NULL);
+
+  $post_fields = array(
+    'program' => $program['program'],
+    'episode' => $program['episode'],
+    'episode_code' => $program['episode_code'],
+    'description' => $program['description'],
+    'delete_datetime' => $program['delete_datetime'],
+    'import_datetime' => $program['import_datetime'],
+    'expected_duration' => $program['expected_duration'],
+    'expected_filename' => $program['expected_filename'],
+    'contributor' => $program['contributor'],
+    'location' => $program['location'],
+    'api_key' => $program['api_key'],
+  );
+
+  //$debug = $post_fields;
+
+  // Curl stuff
+  // Request url
+  $request_url = $server . '/content_api/new';
+
+  $ch = curl_init($request_url);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $post_fields);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_VERBOSE, 1);
+  $curl_exec = curl_exec($ch);
+  curl_close($ch);
+
+  if ($curl_exec == 'true') {
+    drupal_set_message('Pushed to Telvue');
+  }
+  else {
+    drupal_set_message('Pushed to Telvue failed!');
+  }
+
+  return $return;
+}
+
+/**
+ * Edit Program on Telvue server based on ProgramID for the server
+ *
+ */
+// @todo this was never used. commenting out for now -- wluisi 12/28/2017
+/*function telvue_editprogram($program, $server) {
+
+}
+*/
+
+/**
+ * Deletes Program on Telvue server based on ProgramID for the server
+ *
+ */
+// @todo this was never used. commenting out for now -- wluisi 12/28/2017
+/*function telvue_deleteprogram($programid, $server) {
+  $username = 'soap';  //@TODO: set to vailable defined in module
+  $client = new SoapClient($server['ip'] . '/program_service/wsdl');
+  $soap_result = $client->__soapCall("DeleteProgram", array($program_id, $username));
+  return $soap_result;
+}
+*/
+
+/**
+ * Gets Software Version from Telvue server
+ */
+function telvue_software_version($server, $apikey) {
+  $url = $server . '/xml/software_version?api_key=' . $apikey;
+  $response = simplexml_load_file($url);
+
+  $json = json_encode($response);
+  $array = json_decode($json,TRUE);
+
+  return $array;
+}
+
+/**
+ * Helper function to convert hms format to seconds.
+ */
+function telvue_hms2sec($hms) {
+  list($h, $m, $s) = explode (":", $hms);
+	$seconds = 0;
+	$seconds += (intval($h) * 3600);
+	$seconds += (intval($m) * 60);
+	$seconds += (intval($s));
+	return $seconds;
+}

@@ -1,0 +1,21 @@
+name = Telvue Push
+description = "Pushes Standard Metadata Fields to Telvue using Telvue API [PATCHED] by wluisi on 8/8/2015"
+core = 7.x
+
+package = Community Media
+project = Telvue
+
+dependencies[] = telvue
+dependencies[] = password_field
+dependencies[] = field_extract
+dependencies[] = entity
+
+files[] = telvue_push.module
+
+configure = admin/config/system/telvue-push
+
+
+version = "7.x-2.0-alpha1"
+core = "7.x"
+project = "telvue"
+datestamp = "1398793128"
