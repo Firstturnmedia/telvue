@@ -81,6 +81,15 @@ function telvue_push_admin_settings($form, &$form_state) {
     '#description' => t('Number of Days to Add current date before the Program is deleted from Telvue.  Set to 0 to never delete. IMPORTANT: Programs that are scheduled to air will NOT be deleted.  Deleting the Program metadata does NOT delete the MPEG2 from VOL1.'),
   );
 
+  $form['telvue_push_extension'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Telvue Expected Filename Extension'),
+    '#size' => 25,
+    '#maxlength' => 25,
+    '#default_value' => variable_get('telvue_push_extension', '.mpg'),
+    '#description' => t('Extension that should be added to "Expected Filename" value before pushing to Telvue. Examples include ".mpg", ".mpeg", etc.'),
+  );
+
   $form = system_settings_form($form);
 
   return ($form);
@@ -290,6 +299,7 @@ function telvue_push_push($node, $return = TRUE) {
   $src_entity = $mapping['source_entity'];
   $src_bundle = $mapping['source_bundle'];
 
+  //
   $lang = $node->language;
 
   // Check to make sure the Telvue API module has been configured
@@ -308,6 +318,9 @@ function telvue_push_push($node, $return = TRUE) {
     }
   }
 
+  // Get telvue push file extension var, if any, otherwise use .mpg
+  $filename_ext = variable_get('telvue_push_extension', '.mpg');
+
   // Sanitize filename
   if (isset($node->field_expected_filename[$lang][0]['value'])) {
     if (function_exists('transliteration_clean_filename')) {
@@ -317,6 +330,8 @@ function telvue_push_push($node, $return = TRUE) {
     $filename = $node->field_expected_filename[$lang][0]['value'];
 
     // Strip common video suffixes
+    // @todo this doesn't seem to work? entering an expected filename like "test.mpg" will fail
+    // to send to telvue rest api
     $filename = str_replace(".mpg", "", $filename);
     $filename = str_replace(".mov", "", $filename);
     $filename = str_replace(".mp4", "", $filename);
@@ -326,7 +341,8 @@ function telvue_push_push($node, $return = TRUE) {
     $filename = str_replace(".mpeg", "", $filename);
     $filename = str_replace(".avi", "", $filename);
 
-    $filename = $filename . '.mpg';
+    // Append global file ext
+    $filename = $filename . $filename_ext;
   }
 
   if (!$filename) {
